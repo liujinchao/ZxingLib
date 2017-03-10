@@ -22,12 +22,15 @@ import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.Animation;
+import android.view.animation.AnimationSet;
+import android.view.animation.LinearInterpolator;
 import android.view.animation.TranslateAnimation;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -67,6 +70,8 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     private Rect mCropRect = null;
     private boolean isHasSurface = false;
 
+    public static final String SCAN_RESULT = "result";
+
     public Handler getHandler() {
         return handler;
     }
@@ -83,7 +88,10 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_capture);
+        initView();
+    }
 
+    private void initView() {
         scanPreview = (SurfaceView) findViewById(R.id.capture_preview);
         scanContainer = (RelativeLayout) findViewById(R.id.capture_container);
         scanCropView = (RelativeLayout) findViewById(R.id.capture_crop_view);
@@ -91,16 +99,44 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
 
         inactivityTimer = new InactivityTimer(this);
         beepManager = new BeepManager(this);
-
-        TranslateAnimation animation = new TranslateAnimation(Animation.RELATIVE_TO_PARENT, 0.0f, Animation
-                .RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT,
-                0.9f);
-        animation.setDuration(3000);
-        animation.setRepeatCount(-1);
-        animation.setRepeatMode(Animation.RESTART);
-        scanLine.startAnimation(animation);
+        //      二维码开始扫描
+        mHandler.sendEmptyMessage(1);
     }
 
+    private void startAnimation(final ImageView img,int id,float fromY, float toY){
+        scanLine.setImageResource(id);
+        scanLine.startAnimation(getMyAnimSet(fromY, toY));
+    }
+    private AnimationSet getMyAnimSet(float fromY, float toY) {
+        Animation translateAnim = new TranslateAnimation(0, 0, fromY, toY);
+        translateAnim.setDuration(3000);
+        translateAnim.setInterpolator(new LinearInterpolator());
+
+        AnimationSet animSet = new AnimationSet(false);
+        animSet.setFillAfter(true);
+        animSet.addAnimation(translateAnim);
+        return animSet;
+    }
+    private Handler mHandler = new Handler() {
+        public void handleMessage(Message message) {
+
+            switch (message.what) {
+                case 0:
+                    startAnimation(scanLine, R.drawable.scan_line_up, 300,-300);
+                    if (mHandler != null) {
+                        mHandler.sendEmptyMessageDelayed(1, 3000);
+                    }
+                    break;
+                case 1:
+                    startAnimation(scanLine, R.drawable.scan_line, -300, 300);
+                    if (mHandler != null) {
+                        mHandler.sendEmptyMessageDelayed(0, 3000);
+                    }
+                    break;
+            }
+
+        }
+    };
     @Override
     protected void onResume() {
         super.onResume();
@@ -169,7 +205,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         Intent resultIntent = new Intent();
         bundle.putInt("width", mCropRect.width());
         bundle.putInt("height", mCropRect.height());
-        bundle.putString("result", rawResult.getText());
+        bundle.putString(SCAN_RESULT, rawResult.getText());
         resultIntent.putExtras(bundle);
         this.setResult(RESULT_OK, resultIntent);
 //        CaptureActivity.this.finish();

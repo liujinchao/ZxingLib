@@ -89,7 +89,7 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == RESULT_OK) {
             Bundle bundle = data.getExtras();
-            String scanResult = bundle.getString("result");
+            String scanResult = bundle.getString(CaptureActivity.SCAN_RESULT);
             resultTextView.setText(scanResult);
         }
     }
