@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="transparent">#00000000</color>
+    <color name="alpha_80_black">#CC000000</color>
+    <color name="qr_scan_top_color">#5450e6</color>
+
+</resources>

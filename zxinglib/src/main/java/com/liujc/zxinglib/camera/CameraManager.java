@@ -51,7 +51,7 @@ public class CameraManager {
     private AutoFocusManager autoFocusManager;
     private boolean initialized;
     private boolean previewing;
-    private int requestedCameraId = -1;
+    private int requestedCameraId = OpenCameraInterface.NO_REQUESTED_CAMERA;
 
     public CameraManager(Context context) {
         this.context = context;
@@ -158,6 +158,19 @@ public class CameraManager {
         }
     }
 
+    public synchronized void setTorch(boolean newSetting) {
+        if (newSetting != configManager.getTorchState(camera)) {
+            if (camera != null) {
+                if (autoFocusManager != null) {
+                    autoFocusManager.stop();
+                }
+                configManager.setTorch(camera, newSetting);
+                if (autoFocusManager != null) {
+                    autoFocusManager.start();
+                }
+            }
+        }
+    }
     /**
      * A single preview frame will be returned to the handler supplied. The data
      * will arrive as byte[] in the message.obj field, with width and height

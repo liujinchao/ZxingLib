@@ -26,9 +26,9 @@ public class CaptureActivityHandler extends Handler {
     private final CameraManager cameraManager;
     private State state;
 
-    public CaptureActivityHandler(CaptureActivity activity, CameraManager cameraManager, int decodeMode) {
+    public CaptureActivityHandler(CaptureActivity activity, CameraManager cameraManager) {
         this.activity = activity;
-        decodeThread = new DecodeThread(activity, decodeMode);
+        decodeThread = new DecodeThread(activity);
         decodeThread.start();
         state = State.SUCCESS;
 
@@ -48,13 +48,6 @@ public class CaptureActivityHandler extends Handler {
             Bundle bundle = message.getData();
 
             activity.handleDecode((Result) message.obj, bundle);
-//            //实现连续扫描
-//            decodeThread.getHandler().postDelayed(new Runnable() {
-//                @Override
-//                public void run() {
-//                    restartPreviewAndDecode();
-//                }
-//            },2000);
 
         } else if (message.what == R.id.decode_failed) {// We're decoding as fast as possible, so when one
             // decode fails,

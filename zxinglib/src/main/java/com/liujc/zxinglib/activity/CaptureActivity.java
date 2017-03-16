@@ -15,37 +15,51 @@
  */
 package com.liujc.zxinglib.activity;
 
+import android.animation.Animator;
+import android.animation.PropertyValuesHolder;
+import android.animation.ValueAnimator;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.Rect;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.view.animation.AnimationSet;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.TranslateAnimation;
+import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.RadioGroup;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.google.zxing.Result;
 import com.liujc.zxinglib.R;
 import com.liujc.zxinglib.camera.CameraManager;
-import com.liujc.zxinglib.decode.DecodeThread;
+import com.liujc.zxinglib.decode.DecodeUtils;
 import com.liujc.zxinglib.utils.BeepManager;
 import com.liujc.zxinglib.utils.CaptureActivityHandler;
 import com.liujc.zxinglib.utils.InactivityTimer;
+import com.liujc.zxinglib.utils.UriUtils;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 
 /**
  * 类名称：CaptureActivity
@@ -56,6 +70,7 @@ import java.lang.reflect.Field;
 public final class CaptureActivity extends Activity implements SurfaceHolder.Callback {
 
     private static final String TAG = CaptureActivity.class.getSimpleName();
+    public static final int IMAGE_PICKER_REQUEST_CODE = 100;
 
     private CameraManager cameraManager;
     private CaptureActivityHandler handler;
@@ -64,13 +79,26 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
 
     private SurfaceView scanPreview = null;
     private RelativeLayout scanContainer;
-    private RelativeLayout scanCropView;
+    private FrameLayout scanCropView;
     private ImageView scanLine;
+    private Button back_btn;
 
     private Rect mCropRect = null;
     private boolean isHasSurface = false;
 
     public static final String SCAN_RESULT = "result";
+
+    private int mQrcodeCropWidth = 0;
+    private int mQrcodeCropHeight = 0;
+    private int mBarcodeCropWidth = 0;
+    private int mBarcodeCropHeight = 0;
+    Button capturePictureBtn;
+    Button captureLightBtn;
+    RadioGroup captureModeGroup;
+    private boolean isLightOn;
+    //默认是二维码扫描模式
+    private int dataMode = DecodeUtils.DECODE_DATA_MODE_QRCODE;
+
 
     public Handler getHandler() {
         return handler;
@@ -83,24 +111,179 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
-
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_capture);
+        inactivityTimer = new InactivityTimer(this);
+        beepManager = new BeepManager(this);
         initView();
+        initCropViewAnimator();
+        initEvent();
     }
 
     private void initView() {
         scanPreview = (SurfaceView) findViewById(R.id.capture_preview);
         scanContainer = (RelativeLayout) findViewById(R.id.capture_container);
-        scanCropView = (RelativeLayout) findViewById(R.id.capture_crop_view);
+        scanCropView = (FrameLayout) findViewById(R.id.capture_crop_view);
         scanLine = (ImageView) findViewById(R.id.capture_scan_line);
-
-        inactivityTimer = new InactivityTimer(this);
-        beepManager = new BeepManager(this);
-        //      二维码开始扫描
+        capturePictureBtn = (Button) findViewById(R.id.capture_picture_btn);
+        captureLightBtn = (Button) findViewById(R.id.capture_light_btn);
+        captureModeGroup = (RadioGroup) findViewById(R.id.capture_mode_group);
+        back_btn = (Button) findViewById(R.id.back_btn);
+        //扫描动画开始
         mHandler.sendEmptyMessage(1);
+    }
+
+
+    private void initEvent() {
+        back_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                finish();
+            }
+        });
+        capturePictureBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                getPicFromGallery();
+            }
+        });
+
+        captureLightBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (isLightOn) {
+                    cameraManager.setTorch(false);
+                    captureLightBtn.setSelected(false);
+                } else {
+                    cameraManager.setTorch(true);
+                    captureLightBtn.setSelected(true);
+                }
+                isLightOn = !isLightOn;
+            }
+        });
+
+        captureModeGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                if (checkedId == R.id.capture_mode_barcode) {
+                    PropertyValuesHolder qr2barWidthVH = PropertyValuesHolder.ofFloat("width",
+                            1.0f, (float) mBarcodeCropWidth / mQrcodeCropWidth);
+                    PropertyValuesHolder qr2barHeightVH = PropertyValuesHolder.ofFloat("height",
+                            1.0f, (float) mBarcodeCropHeight / mQrcodeCropHeight);
+                    ValueAnimator valueAnimator = ValueAnimator.ofPropertyValuesHolder(qr2barWidthVH, qr2barHeightVH);
+                    valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                        @Override
+                        public void onAnimationUpdate(ValueAnimator animation) {
+                            Float fractionW = (Float) animation.getAnimatedValue("width");
+                            Float fractionH = (Float) animation.getAnimatedValue("height");
+
+                            RelativeLayout.LayoutParams parentLayoutParams = (RelativeLayout.LayoutParams) scanCropView.getLayoutParams();
+                            parentLayoutParams.width = (int) (mQrcodeCropWidth * fractionW);
+                            parentLayoutParams.height = (int) (mQrcodeCropHeight * fractionH);
+                            scanCropView.setLayoutParams(parentLayoutParams);
+                        }
+                    });
+                    valueAnimator.addListener(new Animator.AnimatorListener() {
+                        @Override
+                        public void onAnimationStart(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            initCrop();
+                            setDataMode(DecodeUtils.DECODE_DATA_MODE_BARCODE);
+                        }
+
+                        @Override
+                        public void onAnimationCancel(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationRepeat(Animator animation) {
+
+                        }
+                    });
+                    valueAnimator.start();
+                } else if (checkedId == R.id.capture_mode_qrcode) {
+                    PropertyValuesHolder bar2qrWidthVH = PropertyValuesHolder.ofFloat("width",
+                            1.0f, (float) mQrcodeCropWidth / mBarcodeCropWidth);
+                    PropertyValuesHolder bar2qrHeightVH = PropertyValuesHolder.ofFloat("height",
+                            1.0f, (float) mQrcodeCropHeight / mBarcodeCropHeight);
+                    ValueAnimator valueAnimator = ValueAnimator.ofPropertyValuesHolder(bar2qrWidthVH, bar2qrHeightVH);
+                    valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                        @Override
+                        public void onAnimationUpdate(ValueAnimator animation) {
+                            Float fractionW = (Float) animation.getAnimatedValue("width");
+                            Float fractionH = (Float) animation.getAnimatedValue("height");
+
+                            RelativeLayout.LayoutParams parentLayoutParams = (RelativeLayout.LayoutParams) scanCropView.getLayoutParams();
+                            parentLayoutParams.width = (int) (mBarcodeCropWidth * fractionW);
+                            parentLayoutParams.height = (int) (mBarcodeCropHeight * fractionH);
+                            scanCropView.setLayoutParams(parentLayoutParams);
+                        }
+                    });
+                    valueAnimator.addListener(new Animator.AnimatorListener() {
+                        @Override
+                        public void onAnimationStart(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            initCrop();
+                            setDataMode(DecodeUtils.DECODE_DATA_MODE_QRCODE);
+                        }
+
+                        @Override
+                        public void onAnimationCancel(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationRepeat(Animator animation) {
+
+                        }
+                    });
+                    valueAnimator.start();
+                }
+            }
+        });
+    }
+
+    private String selectImgPath = "";
+    private void getPicFromGallery(){
+        Intent innerIntent = new Intent(); // "android.intent.action.GET_CONTENT"
+        if (Build.VERSION.SDK_INT < 19) {
+            innerIntent.setAction(Intent.ACTION_GET_CONTENT);
+        } else {
+            innerIntent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+        }
+        innerIntent.setType("image/*");
+        Intent wrapperIntent = Intent.createChooser(innerIntent, "选择二维码图片");
+        startActivityForResult(wrapperIntent, IMAGE_PICKER_REQUEST_CODE);
+    }
+
+    @SuppressWarnings("ResourceType")
+    @TargetApi(Build.VERSION_CODES.KITKAT)
+    public static Uri ensureUriPermission(Context context, Intent intent) {
+        Uri uri = intent.getData();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            final int takeFlags = intent.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
+            context.getContentResolver().takePersistableUriPermission(uri, takeFlags);
+        }
+        return uri;
+    }
+
+    private void initCropViewAnimator() {
+        mQrcodeCropWidth = getResources().getDimensionPixelSize(R.dimen.qrcode_crop_width);
+        mQrcodeCropHeight = getResources().getDimensionPixelSize(R.dimen.qrcode_crop_height);
+
+        mBarcodeCropWidth = getResources().getDimensionPixelSize(R.dimen.barcode_crop_width);
+        mBarcodeCropHeight = getResources().getDimensionPixelSize(R.dimen.barcode_crop_height);
     }
 
     private void startAnimation(final ImageView img,int id,float fromY, float toY){
@@ -201,7 +384,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         inactivityTimer.onActivity();
         beepManager.playBeepSoundAndVibrate();
 
-        Toast.makeText(this, rawResult.getText(), Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, rawResult.getText(), Toast.LENGTH_SHORT).show();
         Intent resultIntent = new Intent();
         bundle.putInt("width", mCropRect.width());
         bundle.putInt("height", mCropRect.height());
@@ -210,6 +393,11 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         this.setResult(RESULT_OK, resultIntent);
 //        CaptureActivity.this.finish();
         restartPreviewAfterDelay(2000);
+        Intent intent = new Intent(this, ResultActivity.class);
+        if (null != bundle) {
+            intent.putExtras(bundle);
+        }
+        startActivity(intent);
     }
 
     private void initCamera(SurfaceHolder surfaceHolder) {
@@ -225,7 +413,8 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
             // Creating the handler starts the preview, which can also throw a
             // RuntimeException.
             if (handler == null) {
-                handler = new CaptureActivityHandler(this, cameraManager, DecodeThread.ALL_MODE);
+//                handler = new CaptureActivityHandler(this, cameraManager,getDataMode());
+                handler = new CaptureActivityHandler(this, cameraManager);
             }
 
             initCrop();
@@ -243,7 +432,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     private void displayFrameworkBugMessageAndExit() {
         // camera error
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(getString(R.string.app_name));
+        builder.setTitle("扫一扫");
         builder.setMessage("Camera error");
         builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
 
@@ -276,7 +465,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     /**
      * 初始化截取的矩形区域
      */
-    private void initCrop() {
+    public void initCrop() {
         int cameraWidth = cameraManager.getCameraResolution().y;
         int cameraHeight = cameraManager.getCameraResolution().x;
 
@@ -285,7 +474,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         scanCropView.getLocationInWindow(location);
 
         int cropLeft = location[0];
-//        int cropTop = location[1] - getStatusBarHeight();
         int cropTop = location[1];
 
         int cropWidth = scanCropView.getWidth();
@@ -309,16 +497,49 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         mCropRect = new Rect(x, y, width + x, height + y);
     }
 
-    private int getStatusBarHeight() {
-        try {
-            Class<?> c = Class.forName("com.android.internal.R$dimen");
-            Object obj = c.newInstance();
-            Field field = c.getField("status_bar_height");
-            int x = Integer.parseInt(field.get(obj).toString());
-            return getResources().getDimensionPixelSize(x);
-        } catch (Exception e) {
-            e.printStackTrace();
+    public int getDataMode() {
+        return dataMode;
+    }
+
+    public void setDataMode(int dataMode) {
+        this.dataMode = dataMode;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == RESULT_OK) {
+            switch (requestCode) {
+                case IMAGE_PICKER_REQUEST_CODE:
+                    String[] proj = { MediaStore.Images.Media.DATA };
+                    // 获取选中图片的路径
+                    Cursor cursor = getContentResolver().query(data.getData(),
+                            proj, null, null, null);
+                    if (cursor.moveToFirst()) {
+                        int column_index = cursor
+                                .getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+                        selectImgPath = cursor.getString(column_index);
+                        Uri uri = ensureUriPermission(this, data);
+                        if (selectImgPath == null) {
+                            selectImgPath = UriUtils.getPathByUri(getApplicationContext(),uri);
+                            Log.i("selectImgPath  Utils", selectImgPath);
+                        }
+                        Log.i("selectImgPath", selectImgPath);
+                    }
+                    Bitmap loadedImage = UriUtils.readBitmapFromFileDescriptor(selectImgPath,720,1280);
+                    Result resultZxing = new DecodeUtils(DecodeUtils.DECODE_DATA_MODE_ALL)
+                            .decodeWithZxing(loadedImage);
+                    if (resultZxing != null) {
+                        Bundle extras = new Bundle();
+                        handleDecode(resultZxing, extras);
+                    } else {
+                        Toast.makeText(this, "解析无数据", Toast.LENGTH_SHORT).show();
+                    }
+                    cursor.close();
+                    break;
+
+            }
+
         }
-        return 0;
     }
 }

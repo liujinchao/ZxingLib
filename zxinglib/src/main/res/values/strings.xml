@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Zxinglib</string>
+    <string name="btn_picture">图片</string>
+    <string name="btn_light">灯光</string>
+    <string name="btn_ok">确定</string>
+    <string name="qrcode">二维码</string>
+    <string name="barcode">条形码</string>
 </resources>
