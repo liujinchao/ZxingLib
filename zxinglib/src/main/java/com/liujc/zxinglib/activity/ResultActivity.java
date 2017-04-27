@@ -1,19 +1,3 @@
-/*
- * Copyright (c) 2015 [1076559197@qq.com | tchen0707@gmail.com]
- *
- * Licensed under the Apache License, Version 2.0 (the "License”);
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package com.liujc.zxinglib.activity;
 
 import android.app.Activity;
@@ -25,9 +9,11 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.liujc.zxinglib.R;
 import com.liujc.zxinglib.decode.DecodeThread;
+import com.liujc.zxinglib.utils.ClipboardUtils;
 
 import static com.liujc.zxinglib.activity.CaptureActivity.SCAN_RESULT;
 
@@ -37,7 +23,7 @@ import static com.liujc.zxinglib.activity.CaptureActivity.SCAN_RESULT;
  * 创建时间：Create on 2017/3/16 12:52
  * 描述：扫描结果返回页
  */
-public class ResultActivity extends Activity {
+public class ResultActivity extends Activity implements View.OnLongClickListener{
     ImageView resultImage;
     TextView resultType;
     TextView resultContent;
@@ -63,6 +49,7 @@ public class ResultActivity extends Activity {
         resultImage = (ImageView) findViewById(R.id.result_image);
         resultType = (TextView) findViewById(R.id.result_type);
         resultContent = (TextView) findViewById(R.id.result_content);
+        resultContent.setOnLongClickListener(this);
         back_btn = (Button) findViewById(R.id.back_btn);
     }
 
@@ -111,4 +98,12 @@ public class ResultActivity extends Activity {
         }
     }
 
+    @Override
+    public boolean onLongClick(View view) {
+        if (!TextUtils.isEmpty(resultContent.getText().toString())){
+            ClipboardUtils.copyText(ResultActivity.this,resultContent.getText().toString());
+            Toast.makeText(this, "已复制到剪切板", Toast.LENGTH_SHORT).show();
+        }
+        return true;
+    }
 }

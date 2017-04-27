@@ -1,4 +1,3 @@
-
 package com.liujc.zxinglib.utils;
 
 import android.app.Activity;
@@ -13,12 +12,6 @@ import com.liujc.zxinglib.activity.CaptureActivity;
 import com.liujc.zxinglib.camera.CameraManager;
 import com.liujc.zxinglib.decode.DecodeThread;
 
-/**
- * This class handles all the messaging which comprises the state machine for
- * capture.
- *
- * @author dswitkin@google.com (Daniel Switkin)
- */
 public class CaptureActivityHandler extends Handler {
 
     private final CaptureActivity activity;
