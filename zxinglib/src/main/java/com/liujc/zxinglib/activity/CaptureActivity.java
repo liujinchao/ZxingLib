@@ -71,8 +71,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     private Rect mCropRect = null;
     private boolean isHasSurface = false;
 
-    public static final String SCAN_RESULT = "result";
-
     private int mQrcodeCropWidth = 0;
     private int mQrcodeCropHeight = 0;
     private int mBarcodeCropWidth = 0;
@@ -83,7 +81,9 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     private boolean isLightOn;
     //默认是二维码扫描模式
     private int dataMode = DecodeUtils.DECODE_DATA_MODE_QRCODE;
-
+    public static final String SCAN_RESULT = "result";
+    private boolean needCallBack = false;//默认不需要回调
+    public static final String SCAN_RESULT_CALLBACK = "scan_result_callback";
 
     public Handler getHandler() {
         return handler;
@@ -102,6 +102,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         setContentView(R.layout.activity_capture);
         inactivityTimer = new InactivityTimer(this);
         beepManager = new BeepManager(this);
+        needCallBack = getIntent().getBooleanExtra(SCAN_RESULT_CALLBACK,false);
         initView();
         initCropViewAnimator();
         initEvent();
@@ -375,14 +376,17 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         bundle.putInt("height", mCropRect.height());
         bundle.putString(SCAN_RESULT, rawResult.getText());
         resultIntent.putExtras(bundle);
-        this.setResult(RESULT_OK, resultIntent);
-//        CaptureActivity.this.finish();
-        restartPreviewAfterDelay(2000);
-        Intent intent = new Intent(this, ResultActivity.class);
-        if (null != bundle) {
-            intent.putExtras(bundle);
+        if (needCallBack){
+            this.setResult(RESULT_OK, resultIntent);
+            CaptureActivity.this.finish();
+        }else {
+            Intent intent = new Intent(this, ResultActivity.class);
+            if (null != bundle) {
+                intent.putExtras(bundle);
+            }
+            startActivity(intent);
         }
-        startActivity(intent);
+//        restartPreviewAfterDelay(2000);
     }
 
     private void initCamera(SurfaceHolder surfaceHolder) {

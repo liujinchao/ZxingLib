@@ -40,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 //打开扫描界面扫描条形码或二维码
                 Intent openCameraIntent = new Intent(MainActivity.this, CaptureActivity.class);
+                openCameraIntent.putExtra(CaptureActivity.SCAN_RESULT_CALLBACK,true);
                 startActivityForResult(openCameraIntent, 0);
             }
         });
