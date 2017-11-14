@@ -364,7 +364,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
 
     /**
      * @param rawResult  解码返回结果
-     * @param bundle
+     * @param bundle  数据源
      */
     public void handleDecode(Result rawResult, Bundle bundle) {
         inactivityTimer.onActivity();
