@@ -1,12 +1,11 @@
 apply plugin: 'com.android.library'
+apply from: "../configs/uploadArchives.gradle"
 
 android {
-    compileSdkVersion 25
-    buildToolsVersion "25.0.1"
-
+    compileSdkVersion 28
     defaultConfig {
         minSdkVersion 15
-        targetSdkVersion 25
+        targetSdkVersion 28
         versionCode 1
         versionName "1.0"
 
@@ -22,26 +21,8 @@ android {
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
-        exclude group: 'com.android.support', module: 'support-annotations'
-    })
-    compile 'com.android.support:appcompat-v7:25.0.1'
-    testCompile 'junit:junit:4.12'
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.android.support:appcompat-v7:28.0.0'
     //ZXing
-    compile 'com.google.zxing:core:3.3.0'
-}
-
-//从这里开始配置
-
-//添加下面这句
-apply plugin: 'com.novoda.bintray-release'
-publish {
-    userOrg = 'liujinchao'        //Binary用户名
-    groupId = 'com.liujc.util'        //包名
-    repoName = 'ZxingLib'   //Repository的名字
-    artifactId = 'ZxingLib'   //项目名
-    publishVersion = '1.0.0'            //版本号
-    desc = '一个封装好的zxing二维码、条形码扫描工具'      //description说明，随便写
-    website = 'https://github.com/liujinchao/ZxingDemo' //项目的GitHub网站
+    api 'com.google.zxing:core:3.3.0'
 }

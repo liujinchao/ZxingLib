@@ -13,8 +13,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.liujc.zxinglib.activity.CaptureActivity;
-import com.liujc.zxinglib.encoding.EncodingUtils;
+import com.app.zxinglib.activity.CaptureActivity;
+import com.app.zxinglib.encoding.EncodingUtils;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -39,9 +39,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 //打开扫描界面扫描条形码或二维码
-                Intent openCameraIntent = new Intent(MainActivity.this, CaptureActivity.class);
-                openCameraIntent.putExtra(CaptureActivity.SCAN_RESULT_CALLBACK,true);
-                startActivityForResult(openCameraIntent, 0);
+//                Intent openCameraIntent = new Intent(MainActivity.this, CaptureActivity.class);
+//                openCameraIntent.putExtra(CaptureActivity.SCAN_RESULT_CALLBACK,true);
+//                startActivityForResult(openCameraIntent, 0);
+                CaptureActivity.startActivityForResult(MainActivity.this, 0, true);
             }
         });
 
